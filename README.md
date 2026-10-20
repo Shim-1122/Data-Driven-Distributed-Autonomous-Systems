@@ -8,7 +8,7 @@ Configure a swarm, pick a tactic, launch it against a randomised air defense net
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 
-**Live demo:** https://data-driven-distributed-autonomous-systems.vercel.app (frontend only; runs on the built-in TypeScript engine)
+**Live demo:** https://data-driven-distributed-autonomous.vercel.app (frontend only; runs on the built-in TypeScript engine)
 
 **SCSP Hackathon 2026** · **Track:** Wargaming · **Team:** D3AS_Tools
 

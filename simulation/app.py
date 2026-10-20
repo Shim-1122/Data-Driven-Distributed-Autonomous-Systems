@@ -5,44 +5,42 @@ Flask REST API backend
 All simulation state lives in the module-level `_sim` variable.
 One simulation at a time; POST /api/start replaces any existing run.
 
+Endpoints: GET /api/health, GET /api/state, POST /api/start, POST /api/tick,
+POST /api/run, POST /api/simulate (legacy one-shot), POST /api/camera_toggle.
+See the comment block above each route for request and response details.
+
 Common response shape (SimStateResponse):
   {
-    "tick":         int,   // current tick 0–60
-    "score":        int,   // cumulative score
-    "complete":     bool,  // true once tick 60 is reached
-    "drones_alive": int,
-    "drones_total": int,
+    "tick":               int,    // current tick 0-60
+    "score":              int,    // cumulative score
+    "complete":           bool,   // true once tick 60 is reached
+    "algorithm":          str,    // attack algorithm in use
+    "defense_algorithm":  str,    // defense placement strategy in use
+    "radar_sight":        float,  // radar detection radius (NM)
+    "missile_fire_range": float,  // SAM engagement radius (NM)
+    "camera_drone_range": float,  // camera drone lock-on radius (NM)
+    "drones_alive":       int,
+    "drones_total":       int,
     "entities": {
       "radars": [
         { "id": str, "revealed": bool, "destroyed": bool, "value": 4,
           "x"?: float, "y"?: float }        // x/y only present when revealed
       ],
-      "missile_launchers": [
-        { "id": str, "revealed": bool, "fired": bool, "value": 3,
-          "x"?: float, "y"?: float }
+      "missile_launchers": [                // always visible
+        { "id": str, "x": float, "y": float,
+          "missiles_remaining": int, "destroyed": bool, "value": 3 }
       ],
       "gas_targets": [
         { "id": str, "revealed": bool, "destroyed": bool, "value": 1,
           "x"?: float, "y"?: float }
       ],
       "lucas_drones": [
-        { "id": str, "type": "bait"|"radar_receiver",
-          "x": float, "y": float, "alive": bool, "miles_flown": float }
+        { "id": str, "type": "bait"|"radar_receiver"|"camera",
+          "x": float, "y": float, "alive": bool, "miles_flown": float,
+          "camera_on"?: bool }                // camera drones only
       ]
     },
-    "events": [                             // last 100 events, oldest-first
-      { "tick": int, "type": "radar_ping",
-        "radar_id": str, "x": float, "y": float },
-      { "tick": int, "type": "missile_fired",
-        "launcher_id": str, "target_drone_id": str,
-        "launcher_x": float, "launcher_y": float },
-      { "tick": int, "type": "radar_destroyed",
-        "radar_id": str, "drone_id": str, "score_gained": int,
-        "x": float, "y": float },
-      { "tick": int, "type": "gas_target_destroyed",
-        "target_id": str, "drone_id": str, "score_gained": int,
-        "x": float, "y": float }
-    ]
+    "events": [ ... ]                       // last 100 events, oldest-first
   }
 """
 
@@ -119,8 +117,11 @@ def get_state():
 #
 # Request body (all fields optional, JSON):
 #   {
-#     "num_bait":     int   // bait-drone count      (default 10)
-#     "num_receiver": int   // receiver-drone count  (default 10)
+#     "num_bait", "num_receiver", "num_camera"        drone counts
+#     "num_radars", "num_launchers", "num_gas"        enemy composition
+#     "radar_sight", "missile_fire_range"             ranges in NM
+#     "algorithm", "defense_algorithm"                see VALID_* in simulation.py
+#   Unknown algorithm names fall back to grid_sweep / random.
 #   }
 #
 # Response: SimStateResponse at tick 0
@@ -223,8 +224,11 @@ def run_sim():
 # Request body (JSON):
 #   {
 #     "steps":        int   // ticks to run          (default 10, max 60)
-#     "num_bait":     int   // bait-drone count      (default 10)
-#     "num_receiver": int   // receiver-drone count  (default 10)
+#     "num_bait", "num_receiver", "num_camera"        drone counts
+#     "num_radars", "num_launchers", "num_gas"        enemy composition
+#     "radar_sight", "missile_fire_range"             ranges in NM
+#     "algorithm", "defense_algorithm"                see VALID_* in simulation.py
+#   Unknown algorithm names fall back to grid_sweep / random.
 #   }
 #
 # Response:
@@ -255,7 +259,8 @@ def simulate():
 #   { "drone_id": str }
 #
 # Response:
-#   { "drone_id": str, "camera_on": bool }
+#   SimStateResponse (full state after the toggle)
+# Error 404: { "error": str }  - no camera drone with that id
 # ---------------------------------------------------------------------------
 @app.route("/api/camera_toggle", methods=["POST"])
 def camera_toggle():

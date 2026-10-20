@@ -41,20 +41,30 @@ export default function GamePage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const perRadarDetectionsRef = useRef<Map<string, { drones: Set<string>; tick: number }>>(new Map());
   const phaseRef = useRef<GamePhase>('PLANNING');
-  phaseRef.current = phase;
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  const applyHealth = useCallback((ok: boolean) => {
+    setBackendAvailable(ok);
+    if (!ok) setBackendError('Backend server is offline. Start the Flask server and retry.');
+  }, []);
 
   const checkBackend = useCallback(() => {
     setBackendAvailable(null);
-    healthCheck().then(ok => {
-      setBackendAvailable(ok);
-      if (!ok) setBackendError('Backend server is offline. Start the Flask server and retry.');
-    });
-  }, []);
+    healthCheck().then(applyHealth);
+  }, [applyHealth]);
 
-  // Initial check
+  // Initial check (setState happens in the promise callback, not synchronously)
   useEffect(() => {
-    checkBackend();
-  }, [checkBackend]);
+    let cancelled = false;
+    healthCheck().then(ok => {
+      if (!cancelled) applyHealth(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [applyHealth]);
 
   // Auto-reconnect poll every 5 seconds while offline
   useEffect(() => {
